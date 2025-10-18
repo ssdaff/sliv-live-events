@@ -1,0 +1,47 @@
+# Workflow-এর নাম
+name: Sync JSON File Only every 5 minutes
+
+# কখন এই Workflow চলবে
+on:
+  workflow_dispatch: # ম্যানুয়ালি চালানোর জন্য
+  schedule:
+    # প্রতি ৫ মিনিট পর পর চালানোর জন্য
+    - cron: '*/5 * * * *'
+
+jobs:
+  sync-json:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # ধাপ ১: আপনার নিজের রিপোজিটরির কোড চেকআউট করা
+      # (আপনার html, css, js ফাইলগুলো এখানে আনা হবে)
+      - name: Checkout Your Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SYNC_TOKEN }}
+
+      # ধাপ ২: শুধুমাত্র sonyliv.json ফাইলটি ডাউনলোড করে আপডেট করা
+      # (এটি আপনার html/css ফাইলগুলোকে স্পর্শ করবে না)
+      - name: Download latest sonyliv.json from Upstream
+        run: |
+          curl -o sonyliv.json "https://raw.githubusercontent.com/drmlive/sliv-live-events/main/sonyliv.json"
+
+      # ধাপ ৩: পরিবর্তনগুলো আপনার রিপোজিটরিতে সেভ (Commit) এবং পুশ করা
+      - name: Commit and Push if changed
+        run: |
+          # Git-এর জন্য একটি পরিচয় সেট করা
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # sonyliv.json ফাইলটিকে স্টেজিং-এ যোগ করা
+          git add sonyliv.json
+          
+          # চেক করা হচ্ছে ফাইলটিতে কোনো পরিবর্তন এসেছে কি না
+          # যদি কোনো পরিবর্তন না থাকে, তাহলে commit করা হবে না
+          if git diff --staged --quiet; then
+            echo "No changes to commit. sonyliv.json is already up-to-date."
+          else
+            # যদি পরিবর্তন থাকে, তাহলে commit করে পুশ করা হবে
+            git commit -m "Auto-update sonyliv.json from upstream"
+            git push
+          fi
